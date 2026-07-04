@@ -4,14 +4,14 @@ This phase covers configuring Google Sign-On using NextAuth.js (Auth.js) and pro
 
 ## Checklist
 
-- [ ] Create a Google Cloud Console project.
-- [ ] Configure the OAuth Consent Screen and generate client ID/secret.
-- [ ] Add Google redirect URIs:
+- [x] Create a Google Cloud Console project.
+- [x] Configure the OAuth Consent Screen and generate client ID/secret.
+- [x] Add Google redirect URIs:
   - Local: `http://localhost:3000/api/auth/callback/google`
   - Production: `https://<your-vercel-domain>.vercel.app/api/auth/callback/google`
-- [ ] Create NextAuth configuration at `src/app/api/auth/[...nextauth]/route.ts`.
-- [ ] Add middleware at `src/middleware.ts` to protect app routes.
-- [ ] Create SessionProvider wrapper for client-side authentication states.
+- [x] Create NextAuth configuration at `src/app/api/auth/[...nextauth]/route.ts`.
+- [x] Add middleware at `src/middleware.ts` to protect app routes.
+- [x] Create SessionProvider wrapper for client-side authentication states.
 
 ## Step-by-Step Instructions
 
