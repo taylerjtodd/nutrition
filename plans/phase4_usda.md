@@ -4,17 +4,17 @@ This phase covers building the server-side API proxy to query the USDA FoodData 
 
 ## Checklist
 
-- [ ] Obtain a USDA FDC API Key (fallback to `DEMO_KEY`).
-- [ ] Configure `USDA_API_KEY` in environment variables.
-- [ ] Implement Next.js API route `src/app/api/food/search/route.ts`.
-- [ ] Write normalizer utility to parse nutrients from USDA search output:
+- [x] Obtain a USDA FDC API Key (fallback to `DEMO_KEY`).
+- [x] Configure `USDA_API_KEY` in environment variables.
+- [x] Implement Next.js API route `src/app/api/food/search/route.ts`.
+- [x] Write normalizer utility to parse nutrients from USDA search output:
   - Match "Energy" (unit "kcal") for Calories.
   - Match "Protein" for Protein.
   - Match "Total lipid (fat)" for Total Fat.
   - Match "Carbohydrate, by difference" for Carbs.
   - Match "Fatty acids, total saturated" for Saturated Fat.
-- [ ] Format serving size options (standardizing 100g and brand serving size descriptions).
-- [ ] Implement search error handling and rate-limiting gracefully on the frontend.
+- [x] Format serving size options (standardizing 100g and brand serving size descriptions).
+- [x] Implement search error handling and rate-limiting gracefully on the frontend.
 
 ## Step-by-Step Instructions
 
