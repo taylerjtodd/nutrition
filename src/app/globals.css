@@ -1,8 +1,189 @@
 @import "tailwindcss";
 
+/* ─── Design Tokens ──────────────────────────────────────────────────── */
 @theme {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono:
-    var(--font-geist-mono), ui-monospace, SFMono-Regular, Roboto Mono, Menlo,
-    Monaco, Consolas, monospace;
+  /* Typography */
+  --font-sans: var(--font-outfit), system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Roboto Mono, Menlo, Monaco, Consolas, monospace;
+
+  /* Brand – Sky blue */
+  --color-brand-50:  #f0f7ff;
+  --color-brand-100: #e0effe;
+  --color-brand-200: #bae0fd;
+  --color-brand-400: #38bdf8;
+  --color-brand-500: #0ea5e9;
+  --color-brand-600: #0284c7;
+  --color-brand-700: #0369a1;
+  --color-brand-900: #0c4a6e;
+
+  /* Saturated Fat focus colour – Rose */
+  --color-satfat-400: #fb7185;
+  --color-satfat-500: #f43f5e;
+  --color-satfat-600: #e11d48;
+
+  /* Protein – Violet */
+  --color-protein-400: #a78bfa;
+  --color-protein-500: #8b5cf6;
+
+  /* Carbs – Amber */
+  --color-carbs-400: #fbbf24;
+  --color-carbs-500: #f59e0b;
+
+  /* App backgrounds */
+  --color-bg-base:    #080f1a;
+  --color-bg-surface: #0f172a;
+  --color-bg-card:    #1e293b;
+  --color-bg-muted:   #273548;
+
+  /* Borders */
+  --color-border-subtle: rgba(255, 255, 255, 0.07);
+  --color-border-muted:  rgba(255, 255, 255, 0.12);
+
+  /* Custom easing */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Custom animations */
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-glow:       glow 2s ease-in-out infinite alternate;
+}
+
+/* ─── Base Styles ─────────────────────────────────────────────────────── */
+:root {
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-bg-base);
+  color: #e2e8f0; /* slate-200 */
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100dvh;
+}
+
+/* ─── Custom Scrollbars ───────────────────────────────────────────────── */
+:root {
+  --scrollbar-thumb: rgba(148, 163, 184, 0.25); /* slate-400/25 */
+  --scrollbar-track: transparent;
+}
+
+/* Standard: Baseline Newly Available (Dec 2025) – progressive enhancement */
+* {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+/* Legacy WebKit fallback */
+@supports not (scrollbar-color: auto) {
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+}
+
+/* ─── Keyframes ───────────────────────────────────────────────────────── */
+@keyframes glow {
+  from { opacity: 0.6; }
+  to   { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+/* ─── Utility Layer ───────────────────────────────────────────────────── */
+@layer utilities {
+  /* Glass surfaces */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 1rem;
+  }
+
+  .glass-card-dark {
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--color-border-muted);
+    border-radius: 1rem;
+  }
+
+  /* Glow shadows */
+  .glow-brand {
+    box-shadow: 0 0 30px -6px rgba(14, 165, 233, 0.35);
+  }
+
+  .glow-rose {
+    box-shadow: 0 0 30px -6px rgba(244, 63, 94, 0.35);
+  }
+
+  .glow-violet {
+    box-shadow: 0 0 30px -6px rgba(139, 92, 246, 0.35);
+  }
+
+  /* Gradient text */
+  .gradient-text-brand {
+    background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gradient-text-rose {
+    background: linear-gradient(135deg, #fb7185 0%, #f43f5e 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Interactive hover lift */
+  .hover-lift {
+    transition: transform 0.2s var(--ease-spring), box-shadow 0.2s ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Shimmer skeleton loading */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255,255,255,0.04) 25%,
+      rgba(255,255,255,0.09) 50%,
+      rgba(255,255,255,0.04) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* Focus ring override for dark UI */
+  .focus-ring {
+    outline: none;
+  }
+  .focus-ring:focus-visible {
+    outline: 2px solid rgba(14, 165, 233, 0.75);
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+  }
 }
