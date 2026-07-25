@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { getDailyLog, logFoodItem, deleteFoodItem } from "@/lib/db";
+import { getDailyLog, logFoodItem, deleteFoodItem, updateFoodItem } from "@/lib/db";
 
 // GET /api/log?date=YYYY-MM-DD
 export async function GET(request: NextRequest) {
@@ -79,6 +79,62 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, item: loggedItem });
   } catch (error) {
     console.error(`[POST /api/log] Error logging food item for user ${session.user.id}:`, error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+
+// PUT /api/log
+// Body format: { date: "YYYY-MM-DD", id: "UUID", item: { servingSize, quantity, calories, saturatedFat, totalFat, protein, carbs } }
+export async function PUT(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { date, id, item } = body;
+
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return NextResponse.json({ error: "Invalid or missing 'date'" }, { status: 400 });
+    }
+
+    if (!id) {
+      return NextResponse.json({ error: "Missing 'id'" }, { status: 400 });
+    }
+
+    if (!item || typeof item !== "object") {
+      return NextResponse.json({ error: "Missing 'item' object" }, { status: 400 });
+    }
+
+    const {
+      servingSize,
+      quantity,
+      calories,
+      saturatedFat,
+      totalFat,
+      protein,
+      carbs,
+    } = item;
+
+    const formattedUpdates = {
+      ...(servingSize !== undefined && { servingSize: String(servingSize).trim() }),
+      ...(quantity !== undefined && { quantity: Number(quantity) }),
+      ...(calories !== undefined && { calories: Number(calories) }),
+      ...(saturatedFat !== undefined && { saturatedFat: Number(saturatedFat) }),
+      ...(totalFat !== undefined && { totalFat: Number(totalFat) }),
+      ...(protein !== undefined && { protein: Number(protein) }),
+      ...(carbs !== undefined && { carbs: Number(carbs) }),
+    };
+
+    const updatedItem = await updateFoodItem(session.user.id, date, id, formattedUpdates);
+    if (!updatedItem) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+    
+    return NextResponse.json({ success: true, item: updatedItem });
+  } catch (error) {
+    console.error(`[PUT /api/log] Error updating food item for user ${session.user.id}:`, error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

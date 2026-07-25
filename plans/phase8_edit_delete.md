@@ -16,6 +16,8 @@ This phase details how to build the functionality to edit previously logged food
 Update `src/app/api/log/route.ts` to include:
 - **PUT / PATCH**: Update an existing logged item. It should accept the item ID and the new values (e.g., update `servingCount` and recalculate its total macros based on the base nutritional data stored, or update custom macros for quick-added foods).
 - **DELETE**: Ensure the delete endpoint is robust and correctly removes the specified item ID from the date's list in Redis.
+  - **Implementation Note**: Utilize the existing `deleteFoodItem(userId, date, itemId)` utility from `src/lib/db.ts`.
+  - **Implementation Note**: Check if the day is empty after deletion. If `getDailyLog(userId, date)` returns an empty array, remove the date from the index using `redis.zrem(\`user:\${userId}:logged_dates\`, date)`.
 
 ### 2. Edit Food Modal Component
 Create a new component `EditFoodModal`:

@@ -154,15 +154,49 @@ export async function getDailyLog(
 
 /**
  * Remove a specific food item from a day's log.
- * If the day's log becomes empty after deletion, the date entry remains
- * in the sorted set index (harmless – getDailyLog returns [] for empty hashes).
+ * If the day's log becomes empty after deletion, the date entry is removed
+ * from the sorted set index.
  */
 export async function deleteFoodItem(
   userId: string,
   date: string,
   itemId: string,
 ): Promise<void> {
-  await getRedis().hdel(dailyLogKey(userId, date), itemId);
+  const redis = getRedis();
+  await redis.hdel(dailyLogKey(userId, date), itemId);
+  
+  const remaining = await getDailyLog(userId, date);
+  if (remaining.length === 0) {
+    await redis.zrem(loggedDatesKey(userId), date);
+  }
+}
+
+/**
+ * Update a specific food item in a day's log.
+ */
+export async function updateFoodItem(
+  userId: string,
+  date: string,
+  itemId: string,
+  updates: Partial<Omit<LoggedItem, "id" | "loggedAt">>,
+): Promise<LoggedItem | null> {
+  const redis = getRedis();
+  const raw = await redis.hget(dailyLogKey(userId, date), itemId);
+  if (!raw) return null;
+
+  let item: LoggedItem;
+  if (typeof raw === "string") {
+    item = JSON.parse(raw);
+  } else {
+    item = raw as LoggedItem;
+  }
+
+  const updatedItem: LoggedItem = { ...item, ...updates };
+  await redis.hset(dailyLogKey(userId, date), {
+    [itemId]: JSON.stringify(updatedItem),
+  });
+
+  return updatedItem;
 }
 
 // ─── Logged Dates Index ───────────────────────────────────────────────────────

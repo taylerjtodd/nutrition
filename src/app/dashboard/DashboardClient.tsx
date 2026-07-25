@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { Session } from "next-auth";
 import type { UserSettings, LoggedItem, FocusMacro } from "@/lib/db";
 import LogFoodModal from "@/app/dashboard/LogFoodModal";
+import EditFoodModal from "@/app/dashboard/EditFoodModal";
 import TrendsChart from "@/app/dashboard/TrendsChart";
 
 interface DashboardClientProps {
@@ -72,6 +73,7 @@ export default function DashboardClient({
   // Modals & Drawers Visibility
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isLogModalOpen, setLogModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<LoggedItem | null>(null);
 
   // Tabs & Analytics
   const [activeTab, setActiveTab] = useState<"daily" | "trends">("daily");
@@ -173,6 +175,8 @@ export default function DashboardClient({
 
   // Handle Delete Food Item
   const handleDeleteItem = async (itemId: string) => {
+    if (!window.confirm("Are you sure you want to delete this item?")) return;
+
     // Optimistic UI update
     const previousItems = [...items];
     setItems((prev) => prev.filter((item) => item.id !== itemId));
@@ -550,14 +554,24 @@ export default function DashboardClient({
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => handleDeleteItem(item.id)}
-                        className="opacity-0 group-hover:opacity-100 flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-rose-500/10 hover:text-rose-400 transition-all ml-4"
-                        title="Delete Entry"
-                        aria-label={`Delete ${item.name}`}
-                      >
-                        🗑️
-                      </button>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all ml-4">
+                        <button
+                          onClick={() => setEditingItem(item)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-brand-500/10 hover:text-brand-400 transition-all"
+                          title="Edit Entry"
+                          aria-label={`Edit ${item.name}`}
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => handleDeleteItem(item.id)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-rose-500/10 hover:text-rose-400 transition-all"
+                          title="Delete Entry"
+                          aria-label={`Delete ${item.name}`}
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -741,6 +755,15 @@ export default function DashboardClient({
         onClose={() => setLogModalOpen(false)}
         date={date}
         onLogged={() => fetchDailyLog(date)}
+      />
+
+      {/* ─── Edit Food Modal ─────────────────────────────────────────────────── */}
+      <EditFoodModal
+        isOpen={!!editingItem}
+        onClose={() => setEditingItem(null)}
+        date={date}
+        item={editingItem}
+        onUpdated={() => fetchDailyLog(date)}
       />
     </main>
   );
