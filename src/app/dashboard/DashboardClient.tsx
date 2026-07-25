@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { Session } from "next-auth";
 import type { UserSettings, LoggedItem, FocusMacro } from "@/lib/db";
 import LogFoodModal from "@/app/dashboard/LogFoodModal";
+import TrendsChart from "@/app/dashboard/TrendsChart";
 
 interface DashboardClientProps {
   session: Session;
@@ -72,6 +73,11 @@ export default function DashboardClient({
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isLogModalOpen, setLogModalOpen] = useState(false);
 
+  // Tabs & Analytics
+  const [activeTab, setActiveTab] = useState<"daily" | "trends">("daily");
+  const [analyticsData, setAnalyticsData] = useState<any[]>([]);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
   // Settings Form State
   const [focusMacro, setFocusMacro] = useState<FocusMacro>(initialSettings.focusMacro);
   const [targetSaturatedFat, setTargetSaturatedFat] = useState(initialSettings.targetSaturatedFat);
@@ -110,6 +116,29 @@ export default function DashboardClient({
       fetchDailyLog(date);
     }
   }, [date, fetchDailyLog]);
+
+  // Fetch Analytics
+  const fetchAnalytics = useCallback(async () => {
+    if (analyticsData.length > 0) return;
+    setAnalyticsLoading(true);
+    try {
+      const res = await fetch("/api/analytics");
+      if (res.ok) {
+        const data = await res.json();
+        setAnalyticsData(data.analytics || []);
+      }
+    } catch (error) {
+      console.error("Error loading analytics:", error);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, [analyticsData.length]);
+
+  useEffect(() => {
+    if (activeTab === "trends") {
+      fetchAnalytics();
+    }
+  }, [activeTab, fetchAnalytics]);
 
   // Handle Save Settings
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -257,6 +286,30 @@ export default function DashboardClient({
           </h1>
         </div>
 
+        {/* Tabs */}
+        <div className="flex bg-slate-900/50 p-1 rounded-xl border border-white/5 mx-auto sm:mx-0">
+          <button
+            onClick={() => setActiveTab("daily")}
+            className={`px-6 py-2 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === "daily"
+                ? "bg-brand-500/20 text-brand-400 shadow-sm"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+            }`}
+          >
+            Daily Log
+          </button>
+          <button
+            onClick={() => setActiveTab("trends")}
+            className={`px-6 py-2 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === "trends"
+                ? "bg-brand-500/20 text-brand-400 shadow-sm"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+            }`}
+          >
+            Trends
+          </button>
+        </div>
+
         {/* Date Selector */}
         <div className="flex items-center gap-2 rounded-xl bg-slate-900/50 p-1.5 border border-white/5">
           <button
@@ -287,8 +340,20 @@ export default function DashboardClient({
         </div>
       </div>
 
-      {/* ─── Grid Dashboard Layout ────────────────────────────────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-3 items-start">
+      {/* ─── Content ───────────────────────────────────────────────────────── */}
+      {activeTab === "trends" ? (
+        <div className="glass-card p-6 h-[550px]">
+          {analyticsLoading ? (
+            <div className="flex h-full flex-col items-center justify-center space-y-3">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-700 border-t-brand-500" />
+              <span className="text-sm text-slate-500">Loading yearly trends...</span>
+            </div>
+          ) : (
+            <TrendsChart analytics={analyticsData} settings={settings} />
+          )}
+        </div>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-3 items-start">
         {/* Left Column: Progress Visualization */}
         <div className="space-y-6 lg:col-span-1">
           {/* Main Focus Progress Card */}
@@ -501,6 +566,7 @@ export default function DashboardClient({
           </div>
         </div>
       </div>
+      )}
 
       {/* ─── Target Settings Slide-Over Drawer ───────────────────────────────── */}
       {isSettingsOpen && (
