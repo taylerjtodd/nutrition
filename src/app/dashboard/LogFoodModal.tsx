@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useFormik } from "formik";
+import * as Yup from "yup";
 import type { NormalizedFood } from "@/lib/usda";
 
 interface LogFoodModalProps {
@@ -26,19 +28,106 @@ export default function LogFoodModal({
   const [searchResults, setSearchResults] = useState<NormalizedFood[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [selectedFood, setSelectedFood] = useState<NormalizedFood | null>(null);
-  const [multiplier, setMultiplier] = useState(1);
-  const [loggingItem, setLoggingItem] = useState(false);
 
-  // Quick Add Form State
-  const [quickName, setQuickName] = useState("");
-  const [quickServingSize, setQuickServingSize] = useState("1 serving");
-  const [quickQuantity, setQuickQuantity] = useState(1);
-  const [quickCalories, setQuickCalories] = useState("");
-  const [quickSaturatedFat, setQuickSaturatedFat] = useState("");
-  const [quickTotalFat, setQuickTotalFat] = useState("");
-  const [quickProtein, setQuickProtein] = useState("");
-  const [quickCarbs, setQuickCarbs] = useState("");
-  const [quickSubmitting, setQuickSubmitting] = useState(false);
+  const searchFormik = useFormik({
+    initialValues: { multiplier: 1 },
+    validationSchema: Yup.object({
+      multiplier: Yup.number()
+        .typeError("Must be a number")
+        .positive("Must be > 0")
+        .required("Required"),
+    }),
+    onSubmit: async (values, { setSubmitting }) => {
+      if (!selectedFood) return;
+      try {
+        const displayName = selectedFood.brand
+          ? `${selectedFood.name} (${selectedFood.brand})`
+          : selectedFood.name;
+        
+        const q = Number(values.multiplier);
+
+        const res = await fetch("/api/log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date,
+            item: {
+              name: displayName,
+              servingSize: selectedFood.servingLabel,
+              quantity: q,
+              calories: selectedFood.calories,
+              saturatedFat: selectedFood.saturatedFat,
+              totalFat: selectedFood.totalFat,
+              protein: selectedFood.protein,
+              carbs: selectedFood.carbs,
+            },
+          }),
+        });
+
+        if (res.ok) {
+          onLogged();
+          onClose();
+        }
+      } catch (error) {
+        console.error("Error logging search food:", error);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
+
+  const quickAddFormik = useFormik({
+    initialValues: {
+      name: "",
+      servingSize: "1 serving",
+      quantity: 1,
+      calories: "",
+      saturatedFat: "",
+      totalFat: "",
+      protein: "",
+      carbs: "",
+    },
+    validationSchema: Yup.object({
+      name: Yup.string().required("Required"),
+      servingSize: Yup.string(),
+      quantity: Yup.number().typeError("Must be a number").positive("Must be > 0").required("Required"),
+      calories: Yup.number().typeError("Number").min(0, ">= 0").required("Required"),
+      saturatedFat: Yup.number().typeError("Number").min(0, ">= 0").required("Required"),
+      totalFat: Yup.number().typeError("Number").min(0, ">= 0").required("Required"),
+      protein: Yup.number().typeError("Number").min(0, ">= 0").required("Required"),
+      carbs: Yup.number().typeError("Number").min(0, ">= 0").required("Required"),
+    }),
+    onSubmit: async (values, { setSubmitting }) => {
+      try {
+        const res = await fetch("/api/log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date,
+            item: {
+              name: values.name.trim(),
+              servingSize: values.servingSize.trim() || "1 serving",
+              quantity: Number(values.quantity),
+              calories: Number(values.calories || 0),
+              saturatedFat: Number(values.saturatedFat || 0),
+              totalFat: Number(values.totalFat || 0),
+              protein: Number(values.protein || 0),
+              carbs: Number(values.carbs || 0),
+            },
+          }),
+        });
+
+        if (res.ok) {
+          onLogged();
+          onClose();
+        }
+      } catch (error) {
+        console.error("Error with quick log:", error);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
 
   // Reset modal state when opened/closed
   useEffect(() => {
@@ -47,15 +136,8 @@ export default function LogFoodModal({
       setDebouncedQuery("");
       setSearchResults([]);
       setSelectedFood(null);
-      setMultiplier(1);
-      setQuickName("");
-      setQuickServingSize("1 serving");
-      setQuickQuantity(1);
-      setQuickCalories("");
-      setQuickSaturatedFat("");
-      setQuickTotalFat("");
-      setQuickProtein("");
-      setQuickCarbs("");
+      searchFormik.resetForm();
+      quickAddFormik.resetForm();
       setActiveTab("search");
     }
   }, [isOpen]);
@@ -95,82 +177,9 @@ export default function LogFoodModal({
     searchFood();
   }, [debouncedQuery]);
 
-  // Handle Search Tab Logging
-  const handleLogSearchFood = async () => {
-    if (!selectedFood) return;
-    setLoggingItem(true);
-
-    try {
-      const displayName = selectedFood.brand
-        ? `${selectedFood.name} (${selectedFood.brand})`
-        : selectedFood.name;
-
-      const res = await fetch("/api/log", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date,
-          item: {
-            name: displayName,
-            servingSize: selectedFood.servingLabel,
-            quantity: multiplier,
-            calories: selectedFood.calories,
-            saturatedFat: selectedFood.saturatedFat,
-            totalFat: selectedFood.totalFat,
-            protein: selectedFood.protein,
-            carbs: selectedFood.carbs,
-          },
-        }),
-      });
-
-      if (res.ok) {
-        onLogged();
-        onClose();
-      }
-    } catch (error) {
-      console.error("Error logging search food:", error);
-    } finally {
-      setLoggingItem(false);
-    }
-  };
-
-  // Handle Quick Add Submit
-  const handleQuickAddSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickName.trim()) return;
-    setQuickSubmitting(true);
-
-    try {
-      const res = await fetch("/api/log", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date,
-          item: {
-            name: quickName.trim(),
-            servingSize: quickServingSize.trim() || "1 serving",
-            quantity: Number(quickQuantity),
-            calories: Number(quickCalories || 0),
-            saturatedFat: Number(quickSaturatedFat || 0),
-            totalFat: Number(quickTotalFat || 0),
-            protein: Number(quickProtein || 0),
-            carbs: Number(quickCarbs || 0),
-          },
-        }),
-      });
-
-      if (res.ok) {
-        onLogged();
-        onClose();
-      }
-    } catch (error) {
-      console.error("Error with quick log:", error);
-    } finally {
-      setQuickSubmitting(false);
-    }
-  };
-
   if (!isOpen) return null;
+
+  const displayMultiplier = Number(searchFormik.values.multiplier) || 0;
 
   return (
     <div
@@ -210,6 +219,7 @@ export default function LogFoodModal({
               onClick={() => {
                 setActiveTab("search");
                 setSelectedFood(null);
+                searchFormik.resetForm();
               }}
               className={`flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all ${
                 activeTab === "search"
@@ -280,7 +290,7 @@ export default function LogFoodModal({
                           key={food.fdcId}
                           onClick={() => {
                             setSelectedFood(food);
-                            setMultiplier(1);
+                            searchFormik.resetForm();
                           }}
                           className="w-full text-left p-3 rounded-lg bg-slate-900/30 hover:bg-slate-900/80 border border-white/5 transition-all flex justify-between items-start gap-4"
                         >
@@ -335,14 +345,21 @@ export default function LogFoodModal({
                         Adjust to scale serving size values
                       </span>
                     </div>
-                    <input
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      value={multiplier}
-                      onChange={(e) => setMultiplier(Math.max(0.1, Number(e.target.value)))}
-                      className="w-24 rounded-lg bg-slate-900 border border-slate-800 px-3 py-1.5 text-center text-sm font-semibold text-white focus:outline-none focus:border-brand-500"
-                    />
+                    <div className="flex flex-col gap-1 items-end">
+                      <input
+                        type="number"
+                        step="0.1"
+                        {...searchFormik.getFieldProps("multiplier")}
+                        className={`w-24 rounded-lg bg-slate-900 border px-3 py-1.5 text-center text-sm font-semibold text-white focus:outline-none transition-colors ${
+                          searchFormik.touched.multiplier && searchFormik.errors.multiplier
+                            ? "border-rose-500 focus:border-rose-500"
+                            : "border-slate-800 focus:border-brand-500"
+                        }`}
+                      />
+                      {searchFormik.touched.multiplier && searchFormik.errors.multiplier && (
+                        <span className="text-[10px] text-rose-500">{searchFormik.errors.multiplier as string}</span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Scaled Macro Totals */}
@@ -354,35 +371,35 @@ export default function LogFoodModal({
                       <div className="bg-slate-900 rounded-lg p-2 border border-white/5">
                         <span className="text-[9px] text-slate-500 font-medium block">Calories</span>
                         <span className="text-xs font-bold text-white block mt-0.5">
-                          {Math.round(selectedFood.calories * multiplier)}
+                          {Math.round(selectedFood.calories * displayMultiplier)}
                         </span>
                         <span className="text-[8px] text-slate-500 block">kcal</span>
                       </div>
                       <div className="bg-slate-900 rounded-lg p-2 border border-white/5">
                         <span className="text-[9px] text-slate-500 font-medium block">Sat Fat</span>
                         <span className="text-xs font-bold text-rose-400 block mt-0.5">
-                          {Math.round(selectedFood.saturatedFat * multiplier * 10) / 10}
+                          {Math.round(selectedFood.saturatedFat * displayMultiplier * 10) / 10}
                         </span>
                         <span className="text-[8px] text-slate-500 block">g</span>
                       </div>
                       <div className="bg-slate-900 rounded-lg p-2 border border-white/5">
                         <span className="text-[9px] text-slate-500 font-medium block">Protein</span>
                         <span className="text-xs font-bold text-violet-400 block mt-0.5">
-                          {Math.round(selectedFood.protein * multiplier * 10) / 10}
+                          {Math.round(selectedFood.protein * displayMultiplier * 10) / 10}
                         </span>
                         <span className="text-[8px] text-slate-500 block">g</span>
                       </div>
                       <div className="bg-slate-900 rounded-lg p-2 border border-white/5">
                         <span className="text-[9px] text-slate-500 font-medium block">Carbs</span>
                         <span className="text-xs font-bold text-amber-400 block mt-0.5">
-                          {Math.round(selectedFood.carbs * multiplier * 10) / 10}
+                          {Math.round(selectedFood.carbs * displayMultiplier * 10) / 10}
                         </span>
                         <span className="text-[8px] text-slate-500 block">g</span>
                       </div>
                       <div className="bg-slate-900 rounded-lg p-2 border border-white/5">
                         <span className="text-[9px] text-slate-500 font-medium block">Total Fat</span>
                         <span className="text-xs font-bold text-indigo-400 block mt-0.5">
-                          {Math.round(selectedFood.totalFat * multiplier * 10) / 10}
+                          {Math.round(selectedFood.totalFat * displayMultiplier * 10) / 10}
                         </span>
                         <span className="text-[8px] text-slate-500 block">g</span>
                       </div>
@@ -400,11 +417,11 @@ export default function LogFoodModal({
                     </button>
                     <button
                       type="button"
-                      onClick={handleLogSearchFood}
-                      disabled={loggingItem}
+                      onClick={() => searchFormik.handleSubmit()}
+                      disabled={searchFormik.isSubmitting || !searchFormik.isValid}
                       className="flex-1 rounded-xl bg-brand-500 py-3 text-sm font-semibold text-white hover:bg-brand-600 active:scale-95 transition-all disabled:opacity-50"
                     >
-                      {loggingItem ? "Logging..." : "Log Item"}
+                      {searchFormik.isSubmitting ? "Logging..." : "Log Item"}
                     </button>
                   </div>
                 </div>
@@ -414,47 +431,56 @@ export default function LogFoodModal({
 
           {/* ─── TAB 2: QUICK ADD ────────────────────────────────────────────── */}
           {activeTab === "quickAdd" && (
-            <form onSubmit={handleQuickAddSubmit} className="mt-5 space-y-4">
+            <form onSubmit={quickAddFormik.handleSubmit} className="mt-5 space-y-4">
               {/* Name */}
               <div className="space-y-1">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Food Name *
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-400 flex justify-between">
+                  <span>Food Name *</span>
+                  {quickAddFormik.touched.name && quickAddFormik.errors.name && (
+                    <span className="text-rose-500 normal-case">{quickAddFormik.errors.name as string}</span>
+                  )}
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder="e.g. Scrambled Eggs, Avocado Toast"
-                  value={quickName}
-                  onChange={(e) => setQuickName(e.target.value)}
-                  className="w-full rounded-xl bg-slate-950 border border-slate-850 px-3.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-brand-500 transition-colors"
+                  {...quickAddFormik.getFieldProps("name")}
+                  className={`w-full rounded-xl bg-slate-950 border px-3.5 py-2 text-sm text-slate-200 focus:outline-none transition-colors ${
+                    quickAddFormik.touched.name && quickAddFormik.errors.name
+                      ? "border-rose-500 focus:border-rose-500"
+                      : "border-slate-850 focus:border-brand-500"
+                  }`}
                 />
               </div>
 
               {/* Serving details */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400">
-                    Serving Description
+                  <label className="text-xs text-slate-400 flex justify-between">
+                    <span>Serving Description</span>
                   </label>
                   <input
                     type="text"
                     placeholder="e.g. 1 plate, 150g"
-                    value={quickServingSize}
-                    onChange={(e) => setQuickServingSize(e.target.value)}
+                    {...quickAddFormik.getFieldProps("servingSize")}
                     className="w-full rounded-xl bg-slate-950 border border-slate-850 px-3.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-brand-500 transition-colors"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400">
-                    Quantity Multiplier
+                  <label className="text-xs text-slate-400 flex justify-between">
+                    <span>Quantity Multiplier</span>
+                    {quickAddFormik.touched.quantity && quickAddFormik.errors.quantity && (
+                      <span className="text-rose-500">{quickAddFormik.errors.quantity as string}</span>
+                    )}
                   </label>
                   <input
                     type="number"
-                    min="0.1"
                     step="0.1"
-                    value={quickQuantity}
-                    onChange={(e) => setQuickQuantity(Math.max(0.1, Number(e.target.value)))}
-                    className="w-full rounded-xl bg-slate-950 border border-slate-850 px-3.5 py-2 text-sm text-slate-200 focus:outline-none focus:border-brand-500 transition-colors"
+                    {...quickAddFormik.getFieldProps("quantity")}
+                    className={`w-full rounded-xl bg-slate-950 border px-3.5 py-2 text-sm text-slate-200 focus:outline-none transition-colors ${
+                      quickAddFormik.touched.quantity && quickAddFormik.errors.quantity
+                        ? "border-rose-500 focus:border-rose-500"
+                        : "border-slate-850 focus:border-brand-500"
+                    }`}
                   />
                 </div>
               </div>
@@ -472,15 +498,21 @@ export default function LogFoodModal({
                   <div className="space-y-1">
                     <label className="text-xs text-slate-400 flex justify-between">
                       <span>Calories</span>
-                      <span className="text-slate-500">kcal</span>
+                      {quickAddFormik.touched.calories && quickAddFormik.errors.calories ? (
+                        <span className="text-rose-500">{quickAddFormik.errors.calories as string}</span>
+                      ) : (
+                        <span className="text-slate-500">kcal</span>
+                      )}
                     </label>
                     <input
                       type="number"
-                      min="0"
                       placeholder="0"
-                      value={quickCalories}
-                      onChange={(e) => setQuickCalories(e.target.value)}
-                      className="w-full rounded-xl bg-slate-950 border border-slate-850 px-3.5 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-brand-500 transition-colors"
+                      {...quickAddFormik.getFieldProps("calories")}
+                      className={`w-full rounded-xl bg-slate-950 border px-3.5 py-1.5 text-sm text-slate-200 focus:outline-none transition-colors ${
+                        quickAddFormik.touched.calories && quickAddFormik.errors.calories
+                          ? "border-rose-500 focus:border-rose-500"
+                          : "border-slate-850 focus:border-brand-500"
+                      }`}
                     />
                   </div>
 
@@ -488,16 +520,22 @@ export default function LogFoodModal({
                   <div className="space-y-1">
                     <label className="text-xs text-slate-400 flex justify-between">
                       <span>Saturated Fat</span>
-                      <span className="text-slate-500">g</span>
+                      {quickAddFormik.touched.saturatedFat && quickAddFormik.errors.saturatedFat ? (
+                        <span className="text-rose-500">{quickAddFormik.errors.saturatedFat as string}</span>
+                      ) : (
+                        <span className="text-slate-500">g</span>
+                      )}
                     </label>
                     <input
                       type="number"
-                      min="0"
                       step="0.1"
                       placeholder="0.0"
-                      value={quickSaturatedFat}
-                      onChange={(e) => setQuickSaturatedFat(e.target.value)}
-                      className="w-full rounded-xl bg-slate-950 border border-slate-850 px-3.5 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-brand-500 transition-colors"
+                      {...quickAddFormik.getFieldProps("saturatedFat")}
+                      className={`w-full rounded-xl bg-slate-950 border px-3.5 py-1.5 text-sm text-slate-200 focus:outline-none transition-colors ${
+                        quickAddFormik.touched.saturatedFat && quickAddFormik.errors.saturatedFat
+                          ? "border-rose-500 focus:border-rose-500"
+                          : "border-slate-850 focus:border-brand-500"
+                      }`}
                     />
                   </div>
 
@@ -505,16 +543,22 @@ export default function LogFoodModal({
                   <div className="space-y-1">
                     <label className="text-xs text-slate-400 flex justify-between">
                       <span>Total Fat</span>
-                      <span className="text-slate-500">g</span>
+                      {quickAddFormik.touched.totalFat && quickAddFormik.errors.totalFat ? (
+                        <span className="text-rose-500">{quickAddFormik.errors.totalFat as string}</span>
+                      ) : (
+                        <span className="text-slate-500">g</span>
+                      )}
                     </label>
                     <input
                       type="number"
-                      min="0"
                       step="0.1"
                       placeholder="0.0"
-                      value={quickTotalFat}
-                      onChange={(e) => setQuickTotalFat(e.target.value)}
-                      className="w-full rounded-xl bg-slate-950 border border-slate-850 px-3.5 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-brand-500 transition-colors"
+                      {...quickAddFormik.getFieldProps("totalFat")}
+                      className={`w-full rounded-xl bg-slate-950 border px-3.5 py-1.5 text-sm text-slate-200 focus:outline-none transition-colors ${
+                        quickAddFormik.touched.totalFat && quickAddFormik.errors.totalFat
+                          ? "border-rose-500 focus:border-rose-500"
+                          : "border-slate-850 focus:border-brand-500"
+                      }`}
                     />
                   </div>
 
@@ -522,16 +566,22 @@ export default function LogFoodModal({
                   <div className="space-y-1">
                     <label className="text-xs text-slate-400 flex justify-between">
                       <span>Protein</span>
-                      <span className="text-slate-500">g</span>
+                      {quickAddFormik.touched.protein && quickAddFormik.errors.protein ? (
+                        <span className="text-rose-500">{quickAddFormik.errors.protein as string}</span>
+                      ) : (
+                        <span className="text-slate-500">g</span>
+                      )}
                     </label>
                     <input
                       type="number"
-                      min="0"
                       step="0.1"
                       placeholder="0.0"
-                      value={quickProtein}
-                      onChange={(e) => setQuickProtein(e.target.value)}
-                      className="w-full rounded-xl bg-slate-950 border border-slate-850 px-3.5 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-brand-500 transition-colors"
+                      {...quickAddFormik.getFieldProps("protein")}
+                      className={`w-full rounded-xl bg-slate-950 border px-3.5 py-1.5 text-sm text-slate-200 focus:outline-none transition-colors ${
+                        quickAddFormik.touched.protein && quickAddFormik.errors.protein
+                          ? "border-rose-500 focus:border-rose-500"
+                          : "border-slate-850 focus:border-brand-500"
+                      }`}
                     />
                   </div>
 
@@ -539,16 +589,22 @@ export default function LogFoodModal({
                   <div className="space-y-1 col-span-2">
                     <label className="text-xs text-slate-400 flex justify-between">
                       <span>Carbohydrates</span>
-                      <span className="text-slate-500">g</span>
+                      {quickAddFormik.touched.carbs && quickAddFormik.errors.carbs ? (
+                        <span className="text-rose-500">{quickAddFormik.errors.carbs as string}</span>
+                      ) : (
+                        <span className="text-slate-500">g</span>
+                      )}
                     </label>
                     <input
                       type="number"
-                      min="0"
                       step="0.1"
                       placeholder="0.0"
-                      value={quickCarbs}
-                      onChange={(e) => setQuickCarbs(e.target.value)}
-                      className="w-full rounded-xl bg-slate-950 border border-slate-850 px-3.5 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-brand-500 transition-colors"
+                      {...quickAddFormik.getFieldProps("carbs")}
+                      className={`w-full rounded-xl bg-slate-950 border px-3.5 py-1.5 text-sm text-slate-200 focus:outline-none transition-colors ${
+                        quickAddFormik.touched.carbs && quickAddFormik.errors.carbs
+                          ? "border-rose-500 focus:border-rose-500"
+                          : "border-slate-850 focus:border-brand-500"
+                      }`}
                     />
                   </div>
                 </div>
@@ -565,10 +621,10 @@ export default function LogFoodModal({
                 </button>
                 <button
                   type="submit"
-                  disabled={quickSubmitting}
+                  disabled={quickAddFormik.isSubmitting || !quickAddFormik.isValid}
                   className="flex-1 rounded-xl bg-brand-500 py-3 text-sm font-semibold text-white hover:bg-brand-600 active:scale-95 transition-all disabled:opacity-50"
                 >
-                  {quickSubmitting ? "Logging..." : "Quick Log"}
+                  {quickAddFormik.isSubmitting ? "Logging..." : "Quick Log"}
                 </button>
               </div>
             </form>

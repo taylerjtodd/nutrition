@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { useFormik } from "formik";
+import * as Yup from "yup";
 import type { LoggedItem } from "@/lib/db";
 
 interface EditFoodModalProps {
@@ -18,65 +20,74 @@ export default function EditFoodModal({
   item,
   onUpdated,
 }: EditFoodModalProps) {
-  const [quantity, setQuantity] = useState(1);
-  const [submitting, setSubmitting] = useState(false);
+  const currentQ = item?.quantity || 1;
+  const baseCalories = (item?.calories || 0) / currentQ;
+  const baseSatFat = (item?.saturatedFat || 0) / currentQ;
+  const baseTotalFat = (item?.totalFat || 0) / currentQ;
+  const baseProtein = (item?.protein || 0) / currentQ;
+  const baseCarbs = (item?.carbs || 0) / currentQ;
 
-  // When opened with an item, initialize state
+  const formik = useFormik({
+    initialValues: {
+      quantity: item?.quantity ?? 1,
+    },
+    enableReinitialize: true,
+    validationSchema: Yup.object({
+      quantity: Yup.number()
+        .typeError("Must be a number")
+        .positive("Must be > 0")
+        .required("Required"),
+    }),
+    onSubmit: async (values, { setSubmitting }) => {
+      if (!item) return;
+      const q = Number(values.quantity);
+      try {
+        const res = await fetch(`/api/log`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date,
+            id: item.id,
+            item: {
+              quantity: q,
+              calories: Math.round(baseCalories * q),
+              saturatedFat: Math.round(baseSatFat * q * 10) / 10,
+              totalFat: Math.round(baseTotalFat * q * 10) / 10,
+              protein: Math.round(baseProtein * q * 10) / 10,
+              carbs: Math.round(baseCarbs * q * 10) / 10,
+            },
+          }),
+        });
+
+        if (res.ok) {
+          onUpdated();
+          onClose();
+        } else {
+          console.error("Failed to update item");
+        }
+      } catch (error) {
+        console.error("Error updating item:", error);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
+
+  // Reset form when modal closes
   useEffect(() => {
-    if (isOpen && item) {
-      setQuantity(item.quantity || 1);
+    if (!isOpen) {
+      formik.resetForm();
     }
-  }, [isOpen, item]);
+  }, [isOpen]);
 
   if (!isOpen || !item) return null;
 
-  // Base values computed by dividing current values by current quantity
-  const currentQ = item.quantity || 1;
-  const baseCalories = item.calories / currentQ;
-  const baseSatFat = item.saturatedFat / currentQ;
-  const baseTotalFat = item.totalFat / currentQ;
-  const baseProtein = item.protein / currentQ;
-  const baseCarbs = item.carbs / currentQ;
-
-  // New computed values based on new quantity
-  const newCalories = Math.round(baseCalories * quantity);
-  const newSatFat = Math.round(baseSatFat * quantity * 10) / 10;
-  const newTotalFat = Math.round(baseTotalFat * quantity * 10) / 10;
-  const newProtein = Math.round(baseProtein * quantity * 10) / 10;
-  const newCarbs = Math.round(baseCarbs * quantity * 10) / 10;
-
-  const handleUpdate = async () => {
-    setSubmitting(true);
-    try {
-      const res = await fetch(`/api/log`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date,
-          id: item.id,
-          item: {
-            quantity,
-            calories: newCalories,
-            saturatedFat: newSatFat,
-            totalFat: newTotalFat,
-            protein: newProtein,
-            carbs: newCarbs,
-          },
-        }),
-      });
-
-      if (res.ok) {
-        onUpdated();
-        onClose();
-      } else {
-        console.error("Failed to update item");
-      }
-    } catch (error) {
-      console.error("Error updating item:", error);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const displayQuantity = Number(formik.values.quantity) || 0;
+  const newCalories = Math.round(baseCalories * displayQuantity);
+  const newSatFat = Math.round(baseSatFat * displayQuantity * 10) / 10;
+  const newTotalFat = Math.round(baseTotalFat * displayQuantity * 10) / 10;
+  const newProtein = Math.round(baseProtein * displayQuantity * 10) / 10;
+  const newCarbs = Math.round(baseCarbs * displayQuantity * 10) / 10;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -118,14 +129,21 @@ export default function EditFoodModal({
                   Adjust to scale serving size values
                 </span>
               </div>
-              <input
-                type="number"
-                min="0.1"
-                step="0.1"
-                value={quantity}
-                onChange={(e) => setQuantity(Math.max(0.1, Number(e.target.value)))}
-                className="w-24 rounded-lg bg-slate-900 border border-slate-800 px-3 py-1.5 text-center text-sm font-semibold text-white focus:outline-none focus:border-brand-500"
-              />
+              <div className="flex flex-col items-end gap-1">
+                <input
+                  type="number"
+                  step="0.1"
+                  {...formik.getFieldProps("quantity")}
+                  className={`w-24 rounded-lg bg-slate-900 border px-3 py-1.5 text-center text-sm font-semibold text-white focus:outline-none transition-colors ${
+                    formik.touched.quantity && formik.errors.quantity
+                      ? "border-rose-500 focus:border-rose-500"
+                      : "border-slate-800 focus:border-brand-500"
+                  }`}
+                />
+                {formik.touched.quantity && formik.errors.quantity && (
+                  <span className="text-[10px] text-rose-500">{formik.errors.quantity as string}</span>
+                )}
+              </div>
             </div>
 
             {/* Scaled Macro Totals */}
@@ -178,17 +196,17 @@ export default function EditFoodModal({
                 type="button"
                 onClick={onClose}
                 className="flex-1 rounded-xl border border-slate-800 py-3 text-sm font-semibold text-slate-400 hover:bg-slate-900 hover:text-white transition-colors"
-                disabled={submitting}
+                disabled={formik.isSubmitting}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={handleUpdate}
-                disabled={submitting}
+                onClick={() => formik.handleSubmit()}
+                disabled={formik.isSubmitting || !formik.isValid}
                 className="flex-[2] rounded-xl bg-brand-500 py-3 text-sm font-bold text-white shadow-lg shadow-brand-500/25 hover:bg-brand-400 hover:shadow-brand-500/40 transition-all disabled:opacity-50"
               >
-                {submitting ? "Updating..." : "Save Changes"}
+                {formik.isSubmitting ? "Updating..." : "Save Changes"}
               </button>
             </div>
           </div>
