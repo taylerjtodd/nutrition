@@ -524,12 +524,12 @@ export default function DashboardClient({
                       className="group flex items-center justify-between p-4 rounded-xl bg-slate-900/40 hover:bg-slate-900/80 border border-white/5 transition-all hover:border-slate-800"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-semibold text-slate-200 truncate text-sm">
+                        <div className="flex items-start gap-2">
+                          <h4 className="font-semibold text-slate-200 text-sm break-words">
                             {item.name}
                           </h4>
                           {qty !== 1 && (
-                            <span className="rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-400 border border-white/5">
+                            <span className="rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-400 border border-white/5 shrink-0 mt-0.5">
                               x{qty}
                             </span>
                           )}
@@ -554,7 +554,7 @@ export default function DashboardClient({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all ml-4">
+                      <div className="flex items-center gap-1 ml-4 shrink-0">
                         <button
                           onClick={() => setEditingItem(item)}
                           className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-brand-500/10 hover:text-brand-400 transition-all"
